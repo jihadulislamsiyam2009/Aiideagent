@@ -729,12 +729,263 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Security Scanning Routes
+  app.post("/api/security/scan", async (req, res) => {
+    try {
+      const { projectId, projectPath } = req.body;
+      const { securityService } = await import('./services/securityService');
+      const scanId = await securityService.scanProject(projectId, projectPath);
+      res.json({ scanId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/security/scans/:scanId", async (req, res) => {
+    try {
+      const { scanId } = req.params;
+      const { securityService } = await import('./services/securityService');
+      const result = securityService.getScanResult(scanId);
+      if (result) {
+        res.json(result);
+      } else {
+        res.status(404).json({ error: 'Scan not found' });
+      }
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/security/scans", async (req, res) => {
+    try {
+      const { projectId } = req.query;
+      const { securityService } = await import('./services/securityService');
+      const scans = securityService.getAllScans(projectId as string);
+      res.json(scans);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Automated Testing Routes
+  app.get("/api/testing/suites/all", async (req, res) => {
+    try {
+      const { automatedTestingService } = await import('./services/automatedTestingService');
+      const suites = automatedTestingService.getAllTestSuites();
+      res.json(suites);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/testing/suites/create", async (req, res) => {
+    try {
+      const suiteConfig = req.body;
+      const { automatedTestingService } = await import('./services/automatedTestingService');
+      const suiteId = await automatedTestingService.createTestSuite(suiteConfig);
+      res.json({ suiteId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/testing/suites/:suiteId/run", async (req, res) => {
+    try {
+      const { suiteId } = req.params;
+      const { automatedTestingService } = await import('./services/automatedTestingService');
+      const resultId = await automatedTestingService.runTestSuite(suiteId);
+      res.json({ resultId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/testing/results/:suiteId", async (req, res) => {
+    try {
+      const { suiteId } = req.params;
+      const { automatedTestingService } = await import('./services/automatedTestingService');
+      const results = automatedTestingService.getTestResults(suiteId);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Distributed Training Routes
+  app.post("/api/distributed/register-node", async (req, res) => {
+    try {
+      const nodeConfig = req.body;
+      const { distributedTrainingService } = await import('./services/distributedTrainingService');
+      const nodeId = await distributedTrainingService.registerNode(nodeConfig);
+      res.json({ nodeId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/distributed/training/start", async (req, res) => {
+    try {
+      const trainingConfig = req.body;
+      const { distributedTrainingService } = await import('./services/distributedTrainingService');
+      const jobId = await distributedTrainingService.startDistributedTraining(trainingConfig);
+      res.json({ jobId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/distributed/jobs/:jobId", async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const { distributedTrainingService } = await import('./services/distributedTrainingService');
+      const job = await distributedTrainingService.getJobStatus(jobId);
+      res.json(job);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/distributed/nodes", async (req, res) => {
+    try {
+      const { distributedTrainingService } = await import('./services/distributedTrainingService');
+      const nodes = distributedTrainingService.getAvailableNodes();
+      res.json(nodes);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Container Service Routes
+  app.post("/api/containers/configs", async (req, res) => {
+    try {
+      const containerConfig = req.body;
+      const { containerService } = await import('./services/containerService');
+      const configId = await containerService.createContainerConfig(containerConfig);
+      res.json({ configId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/containers/:configId/build", async (req, res) => {
+    try {
+      const { configId } = req.params;
+      const { containerService } = await import('./services/containerService');
+      const imageName = await containerService.buildContainer(configId);
+      res.json({ imageName });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/containers/:configId/run", async (req, res) => {
+    try {
+      const { configId } = req.params;
+      const { imageName } = req.body;
+      const { containerService } = await import('./services/containerService');
+      const instanceId = await containerService.runContainer(configId, imageName);
+      res.json({ instanceId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/containers/instances", async (req, res) => {
+    try {
+      const { containerService } = await import('./services/containerService');
+      const instances = containerService.getAllContainerInstances();
+      res.json(instances);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/k8s/deployments", async (req, res) => {
+    try {
+      const deploymentConfig = req.body;
+      const { containerService } = await import('./services/containerService');
+      const deploymentId = await containerService.createKubernetesDeployment(deploymentConfig);
+      res.json({ deploymentId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Debugging Service Routes
+  app.post("/api/debug/sessions", async (req, res) => {
+    try {
+      const { projectId, type, config } = req.body;
+      const { debuggingService } = await import('./services/debuggingService');
+      const sessionId = await debuggingService.startDebugSession(projectId, type, config);
+      res.json({ sessionId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/debug/sessions/:sessionId/breakpoints", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { file, line, condition } = req.body;
+      const { debuggingService } = await import('./services/debuggingService');
+      const breakpointId = await debuggingService.addBreakpoint(sessionId, file, line, condition);
+      res.json({ breakpointId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/debug/analyze-error", async (req, res) => {
+    try {
+      const errorInfo = req.body;
+      const { debuggingService } = await import('./services/debuggingService');
+      const analysisId = await debuggingService.analyzeError(errorInfo);
+      res.json({ analysisId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/debug/analyses/:analysisId/fix", async (req, res) => {
+    try {
+      const { analysisId } = req.params;
+      const { suggestionId } = req.body;
+      const { debuggingService } = await import('./services/debuggingService');
+      const fixId = await debuggingService.attemptAutoFix(analysisId, suggestionId);
+      res.json({ fixId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/debug/sessions", async (req, res) => {
+    try {
+      const { debuggingService } = await import('./services/debuggingService');
+      const sessions = debuggingService.getAllDebugSessions();
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   // WebSocket handling
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
+    });
+
+    // Debug session events
+    socket.on('debug-step', async (data) => {
+      // Handle debug step commands
+      socket.emit('debug-update', data);
+    });
+
+    // Training progress events
+    socket.on('training-progress', async (data) => {
+      // Handle training progress updates
+      socket.emit('training-update', data);
     });
   });
 
