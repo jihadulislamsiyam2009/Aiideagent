@@ -261,10 +261,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create project from template
-      const scaffoldResult = await projectService.createProject(name, templateId);
+      const { projectTemplateService } = await import('./services/projectTemplateService');
+      const projectPath = path.join(process.cwd(), 'projects', name);
       
-      if (!scaffoldResult.success) {
-        return res.status(400).json({ error: scaffoldResult.error });
+      const success = await projectTemplateService.createProjectFromTemplate(templateId, name, projectPath);
+      
+      if (!success) {
+        return res.status(400).json({ error: 'Failed to create project from template' });
       }
 
       // Create project record
@@ -273,11 +276,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: description || '',
         userId: 'demo-user', // In production, get from auth
         type: 'template',
-        path: scaffoldResult.projectPath,
+        path: projectPath,
         metadata: { templateId }
       }));
 
-      res.json({ project, scaffoldResult });
+      res.json({ 
+        project, 
+        scaffoldResult: {
+          success: true,
+          projectPath,
+          message: 'Project created successfully'
+        }
+      });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
@@ -285,8 +295,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/projects/templates", async (req, res) => {
     try {
-      const templates = projectService.getTemplates();
+      const { projectTemplateService } = await import('./services/projectTemplateService');
+      const templates = projectTemplateService.getTemplates();
       res.json(templates);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/projects/templates/:templateId", async (req, res) => {
+    try {
+      const { templateId } = req.params;
+      const { projectTemplateService } = await import('./services/projectTemplateService');
+      const template = projectTemplateService.getTemplate(templateId);
+      
+      if (!template) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      
+      res.json(template);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
@@ -415,6 +442,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/files/search", async (req, res) => {
+    try {
+      const { searchTerm, path: searchPath = '.', filePattern = '*' } = req.body;
+      
+      if (!searchTerm) {
+        return res.status(400).json({ error: "Search term is required" });
+      }
+
+      const results = await fileService.searchInFiles(searchTerm, searchPath, filePattern);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/files/copy", async (req, res) => {
+    try {
+      const { sourcePath, destPath } = req.body;
+      
+      if (!sourcePath || !destPath) {
+        return res.status(400).json({ error: "Source and destination paths are required" });
+      }
+
+      await fileService.copyFile(sourcePath, destPath);
+      res.json({ message: "File copied successfully" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/files/move", async (req, res) => {
+    try {
+      const { sourcePath, destPath } = req.body;
+      
+      if (!sourcePath || !destPath) {
+        return res.status(400).json({ error: "Source and destination paths are required" });
+      }
+
+      await fileService.moveFile(sourcePath, destPath);
+      res.json({ message: "File moved successfully" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/files/stats", async (req, res) => {
+    try {
+      const { path: filePath } = req.query;
+      
+      if (!filePath) {
+        return res.status(400).json({ error: "File path is required" });
+      }
+
+      const stats = await fileService.getFileStats(filePath as string);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   app.delete("/api/files", async (req, res) => {
     try {
       const { path: filePath, type = 'file' } = req.query;
@@ -481,6 +568,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sessionId } = req.params;
       const history = terminalService.getCommandHistory(sessionId);
       res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/terminal/:sessionId/autocomplete", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { partialCommand } = req.body;
+
+      if (!partialCommand) {
+        return res.status(400).json({ error: "Partial command is required" });
+      }
+
+      const suggestions = await terminalService.autocomplete(sessionId, partialCommand);
+      res.json({ suggestions });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
