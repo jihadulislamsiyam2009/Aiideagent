@@ -140,16 +140,6 @@ export default function ModelManager() {
             </Button>
           </div>
           
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="ollama" data-testid="tab-ollama">Ollama</TabsTrigger>
-              <TabsTrigger value="huggingface" data-testid="tab-huggingface">Hugging Face</TabsTrigger>
-              <TabsTrigger value="custom" data-testid="tab-custom">Custom</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
-        <div className="p-4 border-b border-border">
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -162,9 +152,18 @@ export default function ModelManager() {
           </div>
         </div>
 
-        <div className="overflow-y-auto scrollbar-hide" style={{ height: 'calc(100% - 180px)' }}>
-          <div className="p-4 space-y-2">
-            <TabsContent value="ollama" className="mt-0">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+          <div className="p-4 border-b border-border">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="ollama" data-testid="tab-ollama">Ollama</TabsTrigger>
+              <TabsTrigger value="huggingface" data-testid="tab-huggingface">Hugging Face</TabsTrigger>
+              <TabsTrigger value="custom" data-testid="tab-custom">Custom</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <div className="overflow-y-auto scrollbar-hide" style={{ height: 'calc(100% - 180px)' }}>
+            <div className="p-4 space-y-2">
+              <TabsContent value="ollama" className="mt-0">
               {models
                 .filter(m => m.source === 'ollama')
                 .filter(m => !searchQuery || m.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -257,8 +256,9 @@ export default function ModelManager() {
                 <p>Custom model support coming soon</p>
               </div>
             </TabsContent>
+            </div>
           </div>
-        </div>
+        </Tabs>
       </div>
 
       {/* Model Details */}
