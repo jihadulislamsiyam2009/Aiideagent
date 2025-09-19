@@ -501,6 +501,234 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // API Testing Routes
+  app.get("/api/testing/suites", async (req, res) => {
+    try {
+      const { projectId } = req.query;
+      res.json({ message: "API testing suites endpoint" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/testing/suites", async (req, res) => {
+    try {
+      const { projectId, endpoints } = req.body;
+      const { apiTestingService } = await import('./services/apiTestingService');
+      await apiTestingService.createTestSuite(projectId, endpoints);
+      res.json({ message: "Test suite created successfully" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/testing/run", async (req, res) => {
+    try {
+      const { projectId } = req.body;
+      const { apiTestingService } = await import('./services/apiTestingService');
+      const results = await apiTestingService.runTests(projectId);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Performance Profiling Routes
+  app.post("/api/performance/profile", async (req, res) => {
+    try {
+      const { projectId, duration } = req.body;
+      const { performanceService } = await import('./services/performanceService');
+      const profileId = await performanceService.startProfiling(projectId, duration);
+      res.json({ profileId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/performance/profiles/:projectId", async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const { performanceService } = await import('./services/performanceService');
+      const profiles = performanceService.getProfiles(projectId);
+      res.json(profiles);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/performance/analyze", async (req, res) => {
+    try {
+      const { projectPath } = req.body;
+      const { performanceService } = await import('./services/performanceService');
+      const suggestions = await performanceService.analyzeCode(projectPath);
+      res.json(suggestions);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // CI/CD Pipeline Routes
+  app.get("/api/cicd/pipelines", async (req, res) => {
+    try {
+      const { cicdService } = await import('./services/cicdService');
+      const pipelines = cicdService.getPipelines();
+      res.json(pipelines);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/cicd/pipelines", async (req, res) => {
+    try {
+      const pipelineConfig = req.body;
+      const { cicdService } = await import('./services/cicdService');
+      await cicdService.createPipeline(pipelineConfig);
+      res.json({ message: "Pipeline created successfully" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/cicd/pipelines/:pipelineId/run", async (req, res) => {
+    try {
+      const { pipelineId } = req.params;
+      const { cicdService } = await import('./services/cicdService');
+      const runId = await cicdService.runPipeline(pipelineId);
+      res.json({ runId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/cicd/runs/:runId", async (req, res) => {
+    try {
+      const { runId } = req.params;
+      const { cicdService } = await import('./services/cicdService');
+      const run = cicdService.getPipelineRun(runId);
+      res.json(run);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Mobile Development Routes
+  app.get("/api/mobile/projects", async (req, res) => {
+    try {
+      const { mobileDevService } = await import('./services/mobileDevService');
+      const projects = mobileDevService.getProjects();
+      res.json(projects);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/mobile/projects", async (req, res) => {
+    try {
+      const projectConfig = req.body;
+      const { mobileDevService } = await import('./services/mobileDevService');
+      const projectId = await mobileDevService.createMobileProject(projectConfig);
+      res.json({ projectId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/mobile/build", async (req, res) => {
+    try {
+      const { projectId, platform, buildType } = req.body;
+      const { mobileDevService } = await import('./services/mobileDevService');
+      const buildId = await mobileDevService.buildProject(projectId, platform, buildType);
+      res.json({ buildId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/mobile/devices", async (req, res) => {
+    try {
+      const { mobileDevService } = await import('./services/mobileDevService');
+      const devices = await mobileDevService.getConnectedDevices();
+      res.json(devices);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Machine Learning Routes
+  app.get("/api/ml/datasets", async (req, res) => {
+    try {
+      const { mlWorkflowService } = await import('./services/mlWorkflowService');
+      const datasets = mlWorkflowService.getDatasets();
+      res.json(datasets);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ml/datasets", async (req, res) => {
+    try {
+      const datasetConfig = req.body;
+      const { mlWorkflowService } = await import('./services/mlWorkflowService');
+      const datasetId = await mlWorkflowService.createDataset(datasetConfig);
+      res.json({ datasetId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/ml/models", async (req, res) => {
+    try {
+      const { mlWorkflowService } = await import('./services/mlWorkflowService');
+      const models = mlWorkflowService.getModels();
+      res.json(models);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ml/models", async (req, res) => {
+    try {
+      const modelConfig = req.body;
+      const { mlWorkflowService } = await import('./services/mlWorkflowService');
+      const modelId = await mlWorkflowService.createModel(modelConfig);
+      res.json({ modelId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ml/train", async (req, res) => {
+    try {
+      const trainingConfig = req.body;
+      const { mlWorkflowService } = await import('./services/mlWorkflowService');
+      const jobId = await mlWorkflowService.startTraining(trainingConfig);
+      res.json({ jobId });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/ml/jobs/:jobId", async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const { mlWorkflowService } = await import('./services/mlWorkflowService');
+      const job = mlWorkflowService.getTrainingJob(jobId);
+      res.json(job);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/ml/gpu-status", async (req, res) => {
+    try {
+      const { mlWorkflowService } = await import('./services/mlWorkflowService');
+      const gpuAvailable = await mlWorkflowService.checkGpuAvailability();
+      res.json({ gpuAvailable });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   // WebSocket handling
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
