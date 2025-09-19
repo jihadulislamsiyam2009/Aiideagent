@@ -1,4 +1,5 @@
-import { spawn, ChildProcess, exec } from 'child_process';
+
+import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import os from 'os';
 import path from 'path';
@@ -6,19 +7,19 @@ import fs from 'fs/promises';
 
 export interface TerminalSession {
   id: string;
-  process: ChildProcess | null; // Allow null when process is not running
+  process: ChildProcess | null;
   cwd: string;
   emitter: EventEmitter;
   isActive: boolean;
   createdAt: Date;
   lastActivity: Date;
-  environment?: NodeJS.ProcessEnv; // For custom environment variables
+  environment: NodeJS.ProcessEnv;
 }
 
 export interface TerminalCommand {
   command: string;
   timestamp: Date;
-  cwd?: string; // Store CWD at the time of command execution
+  cwd: string;
   output?: string;
   error?: string;
   exitCode?: number;
@@ -29,19 +30,25 @@ export class TerminalService {
   private commandHistory: Map<string, TerminalCommand[]> = new Map();
 
   createSession(sessionId: string, initialCwd: string = process.cwd()): TerminalSession {
-    // Clean up existing session if it exists
     this.closeSession(sessionId);
 
     const emitter = new EventEmitter();
-
-    // Determine shell based on OS
-    const shell = os.platform() === 'win32' ? 'cmd.exe' : '/bin/bash';
-    const shellArgs = os.platform() === 'win32' ? [] : [];
+    
+    // Use bash/zsh on Unix, PowerShell on Windows
+    const isWindows = os.platform() === 'win32';
+    const shell = isWindows ? 'powershell.exe' : (process.env.SHELL || '/bin/bash');
+    const shellArgs = isWindows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass'] : ['-l'];
 
     const childProcess = spawn(shell, shellArgs, {
       cwd: initialCwd,
-      stdio: 'pipe',
-      env: { ...process.env, TERM: 'xterm-256color' }
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { 
+        ...process.env, 
+        TERM: 'xterm-256color',
+        PS1: '\\[\\033[01;32m\\]\\u@\\h\\[\\033[00m\\]:\\[\\033[01;34m\\]\\w\\[\\033[00m\\]$ ',
+        FORCE_COLOR: '1'
+      },
+      shell: false
     });
 
     const session: TerminalSession = {
@@ -52,10 +59,10 @@ export class TerminalService {
       isActive: true,
       createdAt: new Date(),
       lastActivity: new Date(),
-      environment: { ...process.env, TERM: 'xterm-256color' } // Initialize with current env
+      environment: { ...process.env, TERM: 'xterm-256color' }
     };
 
-    // Set up event listeners
+    // Set up real-time data streaming
     childProcess.stdout?.on('data', (data) => {
       const output = data.toString();
       session.lastActivity = new Date();
@@ -70,16 +77,21 @@ export class TerminalService {
 
     childProcess.on('close', (code) => {
       session.isActive = false;
-      session.process = null; // Clear the process reference
+      session.process = null;
       emitter.emit('exit', code);
     });
 
     childProcess.on('error', (error) => {
       console.error(`Terminal session ${sessionId} error:`, error);
       session.isActive = false;
-      session.process = null; // Clear the process reference
+      session.process = null;
       emitter.emit('process-error', error.message);
     });
+
+    // Send initial prompt
+    setTimeout(() => {
+      emitter.emit('output', `\x1b[32m${os.userInfo().username}@${os.hostname()}\x1b[0m:\x1b[34m${initialCwd}\x1b[0m$ `);
+    }, 100);
 
     this.sessions.set(sessionId, session);
     this.commandHistory.set(sessionId, []);
@@ -97,15 +109,11 @@ export class TerminalService {
 
   async executeCommand(sessionId: string, command: string): Promise<void> {
     const session = this.sessions.get(sessionId);
-    if (!session) {
-      throw new Error('Terminal session not found');
+    if (!session || !session.isActive || !session.process) {
+      throw new Error('Terminal session not found or inactive');
     }
 
-    if (!session.isActive || !session.process) {
-      throw new Error('Terminal session is not active or process is not available');
-    }
-
-    // Handle built-in commands
+    // Handle built-in commands first
     if (await this.handleBuiltinCommand(session, command)) {
       return;
     }
@@ -117,22 +125,21 @@ export class TerminalService {
       timestamp: new Date(),
       cwd: session.cwd
     });
-    this.commandHistory.set(sessionId, history.slice(-100)); // Keep last 100 commands
+    this.commandHistory.set(sessionId, history.slice(-100));
 
     session.lastActivity = new Date();
 
     try {
-      // Send command to the shell
+      // Send command to shell with newline
       session.process.stdin?.write(command + '\n');
     } catch (error: any) {
-      console.error(`Error writing to stdin for session ${sessionId}:`, error);
-      session.emitter.emit('error', `Error executing command: ${error.message}\n`);
+      console.error(`Error executing command in session ${sessionId}:`, error);
+      session.emitter.emit('error', `Error: ${error.message}\n`);
     }
   }
 
   async changeDirectory(sessionId: string, newPath: string): Promise<void> {
     const session = this.sessions.get(sessionId);
-
     if (!session || !session.isActive || !session.process) {
       throw new Error(`Terminal session ${sessionId} not found or inactive`);
     }
@@ -140,17 +147,15 @@ export class TerminalService {
     const resolvedPath = path.resolve(session.cwd, newPath);
 
     try {
-      // Check if the path exists and is a directory before changing
+      await fs.access(resolvedPath);
       const stats = await fs.stat(resolvedPath);
       if (stats.isDirectory()) {
         session.cwd = resolvedPath;
-        // Emit an output message for successful cd
-        session.emitter.emit('output', `Changed directory to ${resolvedPath}\n`);
+        session.emitter.emit('output', `\n\x1b[32m${os.userInfo().username}@${os.hostname()}\x1b[0m:\x1b[34m${resolvedPath}\x1b[0m$ `);
       } else {
         session.emitter.emit('error', `cd: not a directory: ${newPath}\n`);
       }
-    } catch (error: any) {
-      // Handle errors like "No such file or directory"
+    } catch (error) {
       session.emitter.emit('error', `cd: no such file or directory: ${newPath}\n`);
     }
   }
@@ -165,16 +170,19 @@ export class TerminalService {
 
   closeSession(sessionId: string): boolean {
     const session = this.sessions.get(sessionId);
-
-    if (!session) {
-      return false;
-    }
+    if (!session) return false;
 
     try {
       if (session.isActive && session.process && !session.process.killed) {
-        session.process.kill('SIGTERM');
+        // Graceful shutdown
+        session.process.stdin?.write('exit\n');
+        
+        setTimeout(() => {
+          if (session.process && !session.process.killed) {
+            session.process.kill('SIGTERM');
+          }
+        }, 1000);
 
-        // Force kill after timeout
         setTimeout(() => {
           if (session.process && !session.process.killed) {
             session.process.kill('SIGKILL');
@@ -201,7 +209,6 @@ export class TerminalService {
     }
   }
 
-  // Install commonly needed tools
   async installDependency(sessionId: string, dependency: string, manager: 'npm' | 'pip' | 'apt' = 'npm'): Promise<void> {
     const commands = {
       npm: `npm install ${dependency}`,
@@ -212,32 +219,35 @@ export class TerminalService {
     await this.executeCommand(sessionId, commands[manager]);
   }
 
-  // Run common development tasks
   async runProject(sessionId: string, projectType: string = 'node'): Promise<void> {
     const commands = {
       node: 'npm start',
       python: 'python main.py',
       react: 'npm run dev',
       nextjs: 'npm run dev',
-      django: 'python manage.py runserver',
-      flask: 'flask run'
+      django: 'python manage.py runserver 0.0.0.0:8000',
+      flask: 'flask run --host=0.0.0.0 --port=5000'
     };
 
     const command = commands[projectType as keyof typeof commands] || 'npm start';
     await this.executeCommand(sessionId, command);
   }
 
-  // System resource monitoring
   async getSystemInfo(sessionId: string): Promise<void> {
     const isWindows = os.platform() === 'win32';
     const commands = [
       isWindows ? 'systeminfo | findstr "Total Physical Memory"' : 'free -h',
       isWindows ? 'wmic cpu get name' : 'lscpu | grep "Model name"',
-      isWindows ? 'wmic logicaldisk get size,freespace,caption' : 'df -h'
+      isWindows ? 'wmic logicaldisk get size,freespace,caption' : 'df -h',
+      'node --version',
+      'npm --version',
+      'python --version',
+      'git --version'
     ];
 
     for (const command of commands) {
       await this.executeCommand(sessionId, command);
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
 
@@ -249,39 +259,29 @@ export class TerminalService {
     switch (cmd) {
       case 'cd':
         const newPath = args[0] || os.homedir();
-        const resolvedPath = path.resolve(session.cwd, newPath);
-
-        try {
-          await fs.access(resolvedPath);
-          const stats = await fs.stat(resolvedPath);
-          if (stats.isDirectory()) {
-            session.cwd = resolvedPath;
-            session.emitter.emit('output', `Changed directory to ${resolvedPath}\n`);
-          } else {
-            session.emitter.emit('error', `cd: not a directory: ${newPath}\n`);
-          }
-        } catch (error) {
-          session.emitter.emit('error', `cd: no such file or directory: ${newPath}\n`);
-        }
+        await this.changeDirectory(session.id, newPath);
         return true;
 
       case 'pwd':
-        session.emitter.emit('output', `${session.cwd}\n`);
+        session.emitter.emit('output', `${session.cwd}\n\x1b[32m${os.userInfo().username}@${os.hostname()}\x1b[0m:\x1b[34m${session.cwd}\x1b[0m$ `);
         return true;
 
       case 'clear':
         session.emitter.emit('clear', '');
+        setTimeout(() => {
+          session.emitter.emit('output', `\x1b[32m${os.userInfo().username}@${os.hostname()}\x1b[0m:\x1b[34m${session.cwd}\x1b[0m$ `);
+        }, 50);
         return true;
 
       case 'echo':
-        session.emitter.emit('output', `${args.join(' ')}\n`);
+        session.emitter.emit('output', `${args.join(' ')}\n\x1b[32m${os.userInfo().username}@${os.hostname()}\x1b[0m:\x1b[34m${session.cwd}\x1b[0m$ `);
         return true;
 
       case 'env':
         const envVars = Object.entries(session.environment)
           .map(([key, value]) => `${key}=${value}`)
           .join('\n');
-        session.emitter.emit('output', `${envVars}\n`);
+        session.emitter.emit('output', `${envVars}\n\x1b[32m${os.userInfo().username}@${os.hostname()}\x1b[0m:\x1b[34m${session.cwd}\x1b[0m$ `);
         return true;
 
       case 'history':
@@ -289,12 +289,12 @@ export class TerminalService {
         const historyOutput = history
           .map((entry, index) => `${index + 1}  ${entry.command}`)
           .join('\n');
-        session.emitter.emit('output', `${historyOutput}\n`);
+        session.emitter.emit('output', `${historyOutput}\n\x1b[32m${os.userInfo().username}@${os.hostname()}\x1b[0m:\x1b[34m${session.cwd}\x1b[0m$ `);
         return true;
 
       case 'help':
         const helpText = `
-Built-in commands:
+\x1b[1mBuilt-in commands:\x1b[0m
   cd <dir>     - Change directory
   pwd          - Print working directory
   clear        - Clear terminal
@@ -304,9 +304,11 @@ Built-in commands:
   help         - Show this help
   exit         - Exit terminal session
 
-System commands are also available (ls, cat, grep, etc.)
+\x1b[1mSystem commands are also available:\x1b[0m
+  ls, cat, grep, find, cp, mv, rm, mkdir, rmdir, 
+  npm, node, python, git, curl, wget, etc.
 `;
-        session.emitter.emit('output', helpText);
+        session.emitter.emit('output', `${helpText}\n\x1b[32m${os.userInfo().username}@${os.hostname()}\x1b[0m:\x1b[34m${session.cwd}\x1b[0m$ `);
         return true;
 
       case 'exit':
@@ -326,17 +328,13 @@ System commands are also available (ls, cat, grep, etc.)
     const parts = partialCommand.split(' ');
     const lastPart = parts[parts.length - 1];
 
-    // Command completion
-    if (parts.length === 1 && !lastPart.includes('/') && !lastPart.includes('.') && !lastPart.includes('..')) {
+    if (parts.length === 1 && !lastPart.includes('/')) {
       const builtinCommands = ['cd', 'pwd', 'clear', 'echo', 'env', 'history', 'help', 'exit'];
-      // Note: System commands might be harder to autocomplete reliably without executing them or having a predefined list.
-      // For simplicity, we'll focus on common ones and built-ins.
-      const systemCommands = ['ls', 'cat', 'grep', 'find', 'cp', 'mv', 'rm', 'mkdir', 'rmdir', 'npm', 'node', 'git'];
+      const systemCommands = ['ls', 'cat', 'grep', 'find', 'cp', 'mv', 'rm', 'mkdir', 'rmdir', 'npm', 'node', 'python', 'git', 'curl', 'wget', 'vim', 'nano', 'code'];
 
       const allCommands = [...builtinCommands, ...systemCommands];
       suggestions.push(...allCommands.filter(cmd => cmd.startsWith(lastPart)));
     } else {
-      // File/directory completion
       try {
         let dirPath = '.';
         let baseName = lastPart;
@@ -347,8 +345,8 @@ System commands are also available (ls, cat, grep, etc.)
         }
 
         const fullPath = path.resolve(session.cwd, dirPath);
-
         const items = await fs.readdir(fullPath, { withFileTypes: true });
+        
         for (const item of items) {
           if (item.name.startsWith(baseName)) {
             const suggestion = path.join(dirPath, item.name);
@@ -356,12 +354,39 @@ System commands are also available (ls, cat, grep, etc.)
           }
         }
       } catch (error) {
-        // Ignore errors during completion (e.g., directory not found)
-        console.warn(`Autocomplete error for path "${partialCommand}":`, error);
+        // Ignore errors during completion
       }
     }
 
-    return suggestions.slice(0, 10); // Limit to 10 suggestions
+    return suggestions.slice(0, 10);
+  }
+
+  // Real-time process monitoring
+  async getRunningProcesses(sessionId: string): Promise<void> {
+    const isWindows = os.platform() === 'win32';
+    const command = isWindows ? 'tasklist' : 'ps aux';
+    await this.executeCommand(sessionId, command);
+  }
+
+  // Network utilities
+  async pingHost(sessionId: string, host: string): Promise<void> {
+    const isWindows = os.platform() === 'win32';
+    const command = isWindows ? `ping -n 4 ${host}` : `ping -c 4 ${host}`;
+    await this.executeCommand(sessionId, command);
+  }
+
+  // File operations
+  async createQuickFile(sessionId: string, filename: string, content: string = ''): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error('Session not found');
+
+    const filePath = path.join(session.cwd, filename);
+    try {
+      await fs.writeFile(filePath, content);
+      session.emitter.emit('output', `Created file: ${filename}\n\x1b[32m${os.userInfo().username}@${os.hostname()}\x1b[0m:\x1b[34m${session.cwd}\x1b[0m$ `);
+    } catch (error: any) {
+      session.emitter.emit('error', `Error creating file: ${error.message}\n\x1b[32m${os.userInfo().username}@${os.hostname()}\x1b[0m:\x1b[34m${session.cwd}\x1b[0m$ `);
+    }
   }
 }
 

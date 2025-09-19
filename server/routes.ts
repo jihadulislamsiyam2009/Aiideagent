@@ -1071,6 +1071,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Browser Service Routes
+  app.post("/api/browser/session", async (req, res) => {
+    try {
+      const sessionId = `browser-${Date.now()}`;
+      const { browserService } = await import('./services/browserService');
+      const session = await browserService.createBrowserSession(sessionId);
+      res.json({ sessionId, success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/browser/:sessionId/navigate", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { url, pageId = 'main' } = req.body;
+      const { browserService } = await import('./services/browserService');
+      await browserService.navigateToUrl(sessionId, pageId, url);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/browser/:sessionId/screenshot", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { pageId = 'main' } = req.body;
+      const { browserService } = await import('./services/browserService');
+      const screenshot = await browserService.takeScreenshot(sessionId, pageId);
+      res.json({ screenshot, success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/browser/:sessionId/extract", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { selector, pageId = 'main' } = req.body;
+      const { browserService } = await import('./services/browserService');
+      const data = await browserService.extractData(sessionId, pageId, selector);
+      res.json({ data, success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/browser/:sessionId/click", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { selector, pageId = 'main' } = req.body;
+      const { browserService } = await import('./services/browserService');
+      await browserService.clickElement(sessionId, pageId, selector);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/browser/:sessionId/type", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { selector, text, pageId = 'main' } = req.body;
+      const { browserService } = await import('./services/browserService');
+      await browserService.typeText(sessionId, pageId, selector, text);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/browser/automation/scripts", async (req, res) => {
+    try {
+      const { browserService } = await import('./services/browserService');
+      const scripts = browserService.getAllAutomationScripts();
+      res.json(scripts);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/browser/automation/run", async (req, res) => {
+    try {
+      const { scriptId, url } = req.body;
+      const { browserService } = await import('./services/browserService');
+      const runId = await browserService.runAutomationScript(scriptId, url);
+      res.json({ runId, success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/browser/data/scraped", async (req, res) => {
+    try {
+      const { browserService } = await import('./services/browserService');
+      const data = browserService.getScrapedData();
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/browser/:sessionId/tab", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { browserService } = await import('./services/browserService');
+      const tabId = await browserService.createNewTab(sessionId);
+      res.json({ tabId, success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.delete("/api/browser/:sessionId/tab/:pageId", async (req, res) => {
+    try {
+      const { sessionId, pageId } = req.params;
+      const { browserService } = await import('./services/browserService');
+      await browserService.closeTab(sessionId, pageId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.delete("/api/browser/:sessionId", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { browserService } = await import('./services/browserService');
+      await browserService.closeBrowserSession(sessionId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   // WebSocket handling
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
@@ -1079,15 +1215,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Client disconnected:', socket.id);
     });
 
+    // Terminal events
+    socket.on('terminal-input', async (data) => {
+      const { sessionId, command } = data;
+      try {
+        await terminalService.executeCommand(sessionId, command);
+      } catch (error: any) {
+        socket.emit('terminal-error', { sessionId, error: error.message });
+      }
+    });
+
+    // Browser events
+    socket.on('browser-navigate', async (data) => {
+      const { sessionId, url, pageId } = data;
+      try {
+        const { browserService } = await import('./services/browserService');
+        await browserService.navigateToUrl(sessionId, pageId || 'main', url);
+        socket.emit('browser-navigation-complete', { sessionId, url, pageId });
+      } catch (error: any) {
+        socket.emit('browser-error', { sessionId, error: error.message });
+      }
+    });
+
     // Debug session events
     socket.on('debug-step', async (data) => {
-      // Handle debug step commands
       socket.emit('debug-update', data);
     });
 
     // Training progress events
     socket.on('training-progress', async (data) => {
-      // Handle training progress updates
       socket.emit('training-update', data);
     });
   });

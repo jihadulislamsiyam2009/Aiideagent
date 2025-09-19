@@ -1,9 +1,13 @@
-import { useState } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Globe, 
   ArrowLeft, 
@@ -20,7 +24,9 @@ import {
   Code,
   Eye,
   MousePointer,
-  Keyboard
+  Keyboard,
+  Camera,
+  Loader2
 } from "lucide-react";
 
 interface BrowserTab {
@@ -39,10 +45,18 @@ interface AutomationScript {
   status: 'idle' | 'running' | 'completed' | 'error';
 }
 
+interface ScrapedData {
+  url: string;
+  title: string;
+  data: any;
+  timestamp: string;
+  screenshots?: string[];
+}
+
 export default function Browser() {
   const [tabs, setTabs] = useState<BrowserTab[]>([
     {
-      id: '1',
+      id: 'main',
       title: 'AI Studio Browser',
       url: 'about:blank',
       isActive: true,
@@ -51,47 +65,136 @@ export default function Browser() {
   ]);
   
   const [currentUrl, setCurrentUrl] = useState('');
-  const [automationScripts, setAutomationScripts] = useState<AutomationScript[]>([
-    {
-      id: '1',
-      name: 'Web Scraper',
-      description: 'Extract data from web pages',
-      steps: ['Navigate to URL', 'Find elements', 'Extract text', 'Save data'],
-      status: 'idle'
-    },
-    {
-      id: '2',
-      name: 'Form Filler',
-      description: 'Automatically fill forms',
-      steps: ['Open form', 'Fill inputs', 'Submit form'],
-      status: 'idle'
-    }
-  ]);
-  
+  const [browserSessionId, setBrowserSessionId] = useState<string | null>(null);
+  const [currentScreenshot, setCurrentScreenshot] = useState<string | null>(null);
+  const [pageSource, setPageSource] = useState<string>('');
   const [isRecording, setIsRecording] = useState(false);
   const [recordedActions, setRecordedActions] = useState<string[]>([]);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { toast } = useToast();
 
-  const handleNavigate = () => {
-    if (!currentUrl) return;
-    
-    const activeTab = tabs.find(tab => tab.isActive);
-    if (activeTab) {
-      setTabs(prev => prev.map(tab => 
-        tab.id === activeTab.id 
-          ? { ...tab, url: currentUrl, isLoading: true, title: 'Loading...' }
-          : tab
-      ));
-      
-      // Simulate loading
-      setTimeout(() => {
+  // Queries
+  const { data: automationScripts = [] } = useQuery<AutomationScript[]>({
+    queryKey: ['/api/browser/automation/scripts']
+  });
+
+  const { data: scrapedData = [] } = useQuery<ScrapedData[]>({
+    queryKey: ['/api/browser/data/scraped']
+  });
+
+  // Mutations
+  const createSessionMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('POST', '/api/browser/session');
+    },
+    onSuccess: (data: any) => {
+      setBrowserSessionId(data.sessionId);
+      toast({
+        title: "Browser Session Created",
+        description: "Ready to browse the web"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Create Browser Session",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const navigateMutation = useMutation({
+    mutationFn: async ({ url, pageId }: { url: string, pageId: string }) => {
+      return apiRequest('POST', `/api/browser/${browserSessionId}/navigate`, { url, pageId });
+    },
+    onSuccess: () => {
+      const activeTab = tabs.find(tab => tab.isActive);
+      if (activeTab) {
         setTabs(prev => prev.map(tab => 
           tab.id === activeTab.id 
-            ? { ...tab, isLoading: false, title: getDomainFromUrl(currentUrl) }
+            ? { ...tab, url: currentUrl, isLoading: false, title: getDomainFromUrl(currentUrl) }
             : tab
         ));
-      }, 1000);
+        
+        // Take screenshot after navigation
+        takeScreenshotMutation.mutate({ pageId: activeTab.id });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Navigation Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+      
+      const activeTab = tabs.find(tab => tab.isActive);
+      if (activeTab) {
+        setTabs(prev => prev.map(tab => 
+          tab.id === activeTab.id 
+            ? { ...tab, isLoading: false }
+            : tab
+        ));
+      }
     }
-  };
+  });
+
+  const takeScreenshotMutation = useMutation({
+    mutationFn: async ({ pageId }: { pageId: string }) => {
+      return apiRequest('POST', `/api/browser/${browserSessionId}/screenshot`, { pageId });
+    },
+    onSuccess: (data: any) => {
+      setCurrentScreenshot(data.screenshot);
+    },
+    onError: (error: any) => {
+      console.error('Screenshot failed:', error);
+    }
+  });
+
+  const extractDataMutation = useMutation({
+    mutationFn: async ({ selector, pageId }: { selector: string, pageId: string }) => {
+      return apiRequest('POST', `/api/browser/${browserSessionId}/extract`, { selector, pageId });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Data Extracted",
+        description: `Found ${data.data.length} elements`
+      });
+    }
+  });
+
+  const clickElementMutation = useMutation({
+    mutationFn: async ({ selector, pageId }: { selector: string, pageId: string }) => {
+      return apiRequest('POST', `/api/browser/${browserSessionId}/click`, { selector, pageId });
+    },
+    onSuccess: () => {
+      // Take screenshot after click
+      const activeTab = tabs.find(tab => tab.isActive);
+      if (activeTab) {
+        setTimeout(() => {
+          takeScreenshotMutation.mutate({ pageId: activeTab.id });
+        }, 1000);
+      }
+    }
+  });
+
+  const runAutomationMutation = useMutation({
+    mutationFn: async ({ scriptId, url }: { scriptId: string, url: string }) => {
+      return apiRequest('POST', '/api/browser/automation/run', { scriptId, url });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Automation Started",
+        description: "Script is running in background"
+      });
+    }
+  });
+
+  // Initialize browser session
+  useEffect(() => {
+    if (!browserSessionId) {
+      createSessionMutation.mutate();
+    }
+  }, []);
 
   const getDomainFromUrl = (url: string): string => {
     try {
@@ -101,9 +204,30 @@ export default function Browser() {
     }
   };
 
+  const handleNavigate = () => {
+    if (!currentUrl || !browserSessionId) return;
+    
+    const activeTab = tabs.find(tab => tab.isActive);
+    if (activeTab) {
+      setTabs(prev => prev.map(tab => 
+        tab.id === activeTab.id 
+          ? { ...tab, url: currentUrl, isLoading: true, title: 'Loading...' }
+          : tab
+      ));
+      
+      navigateMutation.mutate({ url: currentUrl, pageId: activeTab.id });
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNavigate();
+    }
+  };
+
   const createNewTab = () => {
     const newTab: BrowserTab = {
-      id: Date.now().toString(),
+      id: `tab-${Date.now()}`,
       title: 'New Tab',
       url: 'about:blank',
       isActive: false,
@@ -123,6 +247,10 @@ export default function Browser() {
     const tab = tabs.find(t => t.id === tabId);
     if (tab) {
       setCurrentUrl(tab.url === 'about:blank' ? '' : tab.url);
+      // Take screenshot of active tab
+      if (tab.url !== 'about:blank' && browserSessionId) {
+        takeScreenshotMutation.mutate({ pageId: tab.id });
+      }
     }
   };
 
@@ -146,35 +274,72 @@ export default function Browser() {
   const startRecording = () => {
     setIsRecording(true);
     setRecordedActions([]);
+    toast({
+      title: "Recording Started",
+      description: "Your actions will be recorded"
+    });
   };
 
   const stopRecording = () => {
     setIsRecording(false);
+    toast({
+      title: "Recording Stopped",
+      description: `Recorded ${recordedActions.length} actions`
+    });
   };
 
   const runAutomationScript = (scriptId: string) => {
-    setAutomationScripts(prev => prev.map(script =>
-      script.id === scriptId ? { ...script, status: 'running' } : script
-    ));
-    
-    // Simulate script execution
-    setTimeout(() => {
-      setAutomationScripts(prev => prev.map(script =>
-        script.id === scriptId ? { ...script, status: 'completed' } : script
-      ));
-    }, 3000);
+    if (!currentUrl) {
+      toast({
+        title: "No URL",
+        description: "Please navigate to a webpage first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    runAutomationMutation.mutate({ scriptId, url: currentUrl });
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'running': return 'bg-primary';
-      case 'completed': return 'bg-accent';
-      case 'error': return 'bg-destructive';
-      default: return 'bg-muted-foreground';
+  const takeScreenshot = () => {
+    const activeTab = tabs.find(tab => tab.isActive);
+    if (activeTab && browserSessionId) {
+      takeScreenshotMutation.mutate({ pageId: activeTab.id });
+    }
+  };
+
+  const extractPageData = (selector: string) => {
+    const activeTab = tabs.find(tab => tab.isActive);
+    if (activeTab && browserSessionId) {
+      extractDataMutation.mutate({ selector, pageId: activeTab.id });
+    }
+  };
+
+  const goBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    }
+  };
+
+  const goForward = () => {
+    window.history.forward();
+  };
+
+  const refreshPage = () => {
+    const activeTab = tabs.find(tab => tab.isActive);
+    if (activeTab && activeTab.url !== 'about:blank') {
+      setTabs(prev => prev.map(tab => 
+        tab.id === activeTab.id 
+          ? { ...tab, isLoading: true }
+          : tab
+      ));
+      
+      navigateMutation.mutate({ url: activeTab.url, pageId: activeTab.id });
     }
   };
 
   const activeTab = tabs.find(tab => tab.isActive);
+  const isLoading = activeTab?.isLoading || navigateMutation.isPending || takeScreenshotMutation.isPending;
 
   return (
     <div className="h-full flex flex-col" data-testid="browser-view">
@@ -223,16 +388,16 @@ export default function Browser() {
 
         {/* Browser Controls */}
         <div className="flex items-center gap-2 p-4">
-          <Button size="sm" variant="ghost" data-testid="button-back">
+          <Button size="sm" variant="ghost" onClick={goBack} data-testid="button-back">
             <ArrowLeft size={16} />
           </Button>
-          <Button size="sm" variant="ghost" data-testid="button-forward">
+          <Button size="sm" variant="ghost" onClick={goForward} data-testid="button-forward">
             <ArrowRight size={16} />
           </Button>
-          <Button size="sm" variant="ghost" data-testid="button-refresh">
+          <Button size="sm" variant="ghost" onClick={refreshPage} data-testid="button-refresh">
             <RotateCcw size={16} />
           </Button>
-          <Button size="sm" variant="ghost" data-testid="button-home">
+          <Button size="sm" variant="ghost" onClick={() => setCurrentUrl('https://google.com')} data-testid="button-home">
             <Home size={16} />
           </Button>
           
@@ -241,22 +406,30 @@ export default function Browser() {
               <Input
                 value={currentUrl}
                 onChange={(e) => setCurrentUrl(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleNavigate()}
+                onKeyPress={handleKeyPress}
                 placeholder="Enter URL or search..."
-                className="pr-10"
+                className="pr-20"
                 data-testid="input-url-bar"
+                disabled={!browserSessionId}
               />
-              <Button
-                size="sm"
-                variant="ghost"
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                onClick={handleNavigate}
-              >
-                <Search size={12} />
-              </Button>
+              <div className="absolute right-1 top-1/2 transform -translate-y-1/2 flex gap-1">
+                {isLoading && <Loader2 size={12} className="animate-spin" />}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0"
+                  onClick={handleNavigate}
+                  disabled={!browserSessionId || !currentUrl}
+                >
+                  <Search size={12} />
+                </Button>
+              </div>
             </div>
           </div>
           
+          <Button size="sm" variant="ghost" onClick={takeScreenshot} data-testid="button-screenshot">
+            <Camera size={16} />
+          </Button>
           <Button size="sm" variant="ghost" data-testid="button-bookmark">
             <Bookmark size={16} />
           </Button>
@@ -281,39 +454,62 @@ export default function Browser() {
                   <div className="flex gap-2 justify-center">
                     <Button 
                       variant="outline" 
-                      onClick={() => setCurrentUrl('https://example.com')}
+                      onClick={() => { setCurrentUrl('https://example.com'); handleNavigate(); }}
+                      disabled={!browserSessionId}
                     >
                       Example Site
                     </Button>
                     <Button 
                       variant="outline"
-                      onClick={() => setCurrentUrl('https://github.com')}
+                      onClick={() => { setCurrentUrl('https://github.com'); handleNavigate(); }}
+                      disabled={!browserSessionId}
                     >
                       GitHub
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => { setCurrentUrl('https://google.com'); handleNavigate(); }}
+                      disabled={!browserSessionId}
+                    >
+                      Google
                     </Button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center bg-background">
-                <div className="text-center">
-                  {activeTab?.isLoading ? (
-                    <>
+              <div className="h-full">
+                {currentScreenshot ? (
+                  <img 
+                    src={currentScreenshot} 
+                    alt="Browser screenshot" 
+                    className="w-full h-full object-top object-contain bg-white"
+                  />
+                ) : isLoading ? (
+                  <div className="flex items-center justify-center h-full bg-background">
+                    <div className="text-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                       <p className="text-muted-foreground">Loading {activeTab.url}...</p>
-                    </>
-                  ) : (
-                    <>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full bg-background">
+                    <div className="text-center">
                       <Globe size={48} className="mx-auto mb-4 text-muted-foreground" />
                       <p className="text-muted-foreground">
-                        Browser content for: <span className="font-mono">{activeTab.url}</span>
+                        Page loaded: <span className="font-mono">{activeTab.url}</span>
                       </p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        (Web content rendering would be implemented here)
-                      </p>
-                    </>
-                  )}
-                </div>
+                      <Button 
+                        onClick={takeScreenshot} 
+                        size="sm" 
+                        className="mt-4"
+                        disabled={takeScreenshotMutation.isPending}
+                      >
+                        {takeScreenshotMutation.isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : <Camera size={14} className="mr-1" />}
+                        Take Screenshot
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -363,7 +559,11 @@ export default function Browser() {
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm">{script.name}</CardTitle>
                       <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${getStatusColor(script.status)}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${
+                          script.status === 'running' ? 'bg-primary animate-pulse' :
+                          script.status === 'completed' ? 'bg-accent' :
+                          script.status === 'error' ? 'bg-destructive' : 'bg-muted-foreground'
+                        }`}></div>
                         <Badge variant="secondary" className="text-xs">
                           {script.status}
                         </Badge>
@@ -385,12 +585,12 @@ export default function Browser() {
                     <Button 
                       size="sm" 
                       className="w-full"
-                      disabled={script.status === 'running'}
+                      disabled={script.status === 'running' || runAutomationMutation.isPending}
                       onClick={() => runAutomationScript(script.id)}
                     >
                       {script.status === 'running' ? (
                         <>
-                          <Pause size={12} className="mr-1" />
+                          <Loader2 size={12} className="mr-1 animate-spin" />
                           Running...
                         </>
                       ) : (
@@ -407,25 +607,45 @@ export default function Browser() {
 
             <TabsContent value="actions" className="p-4 space-y-2">
               <div className="space-y-2">
-                <Button size="sm" variant="outline" className="w-full justify-start">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => extractPageData('a[href]')}
+                  disabled={!browserSessionId || extractDataMutation.isPending}
+                >
                   <MousePointer size={14} className="mr-2" />
-                  Click Element
+                  Extract Links
                 </Button>
-                <Button size="sm" variant="outline" className="w-full justify-start">
-                  <Keyboard size={14} className="mr-2" />
-                  Type Text
-                </Button>
-                <Button size="sm" variant="outline" className="w-full justify-start">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => extractPageData('img[src]')}
+                  disabled={!browserSessionId || extractDataMutation.isPending}
+                >
                   <Eye size={14} className="mr-2" />
-                  Wait for Element
+                  Extract Images
                 </Button>
-                <Button size="sm" variant="outline" className="w-full justify-start">
-                  <Download size={14} className="mr-2" />
-                  Extract Data
-                </Button>
-                <Button size="sm" variant="outline" className="w-full justify-start">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => extractPageData('h1, h2, h3')}
+                  disabled={!browserSessionId || extractDataMutation.isPending}
+                >
                   <Code size={14} className="mr-2" />
-                  Execute Script
+                  Extract Headings
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={takeScreenshot}
+                  disabled={!browserSessionId || takeScreenshotMutation.isPending}
+                >
+                  <Camera size={14} className="mr-2" />
+                  Take Screenshot
                 </Button>
               </div>
               
@@ -449,18 +669,40 @@ export default function Browser() {
               )}
             </TabsContent>
 
-            <TabsContent value="data" className="p-4">
-              <div className="text-center py-8">
-                <Download size={48} className="mx-auto mb-4 text-muted-foreground opacity-20" />
-                <h4 className="font-medium mb-2">Extracted Data</h4>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Run automation scripts to extract and view data
-                </p>
-                <Button size="sm" variant="outline">
-                  <Download size={12} className="mr-1" />
-                  Export Data
-                </Button>
-              </div>
+            <TabsContent value="data" className="p-4 space-y-4">
+              {scrapedData.length > 0 ? (
+                <div className="space-y-4">
+                  {scrapedData.slice(0, 5).map((data, index) => (
+                    <Card key={index}>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm truncate">{data.title}</CardTitle>
+                        <p className="text-xs text-muted-foreground">{data.url}</p>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          {new Date(data.timestamp).toLocaleString()}
+                        </p>
+                        <Button size="sm" variant="outline" className="w-full">
+                          <Download size={12} className="mr-1" />
+                          Export
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Download size={48} className="mx-auto mb-4 text-muted-foreground opacity-20" />
+                  <h4 className="font-medium mb-2">No Data Extracted</h4>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Run automation scripts to extract and view data
+                  </p>
+                  <Button size="sm" variant="outline">
+                    <Download size={12} className="mr-1" />
+                    Export All Data
+                  </Button>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>
