@@ -10,6 +10,11 @@ import { projectService } from "./services/projectService";
 import { aiModelProvider } from "./services/aiModelProvider";
 import { aiAgentService } from "./services/aiAgentService";
 import { insertModelSchema, insertProjectSchema, insertExecutionSchema } from "@shared/schema";
+import { 
+  searchHuggingFaceSchema, downloadModelSchema, pullOllamaSchema,
+  generateTextSchema, generateImageSchema, analyzeImageSchema,
+  analyzeProjectSchema, runProjectSchema, browseWebSchema, executeCommandsSchema
+} from "@shared/aiSchemas";
 import { Server as SocketIOServer } from "socket.io";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -63,8 +68,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       res.json(stats);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -103,8 +112,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ];
 
       res.json(activities);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -113,8 +126,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const models = await storage.getModels();
       res.json(models);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -122,8 +139,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const models = await ollamaService.listModels();
       res.json(models);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -165,8 +186,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ message: "Download started", modelId: model.id });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -182,8 +207,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ message: "Model removed successfully" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -202,8 +231,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       res.json(results);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -212,8 +245,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { category } = req.query;
       const models = await huggingFaceService.getPopularModels(category as string);
       res.json(models);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -254,8 +291,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ message: "Download started", modelId: model.id });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -265,8 +306,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For now, return all projects (in production, filter by user)
       const projects = await storage.getProjectsByUser('demo-user');
       res.json(projects);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -306,8 +351,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: 'Project created successfully'
         }
       });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -316,8 +365,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { projectTemplateService } = await import('./services/projectTemplateService');
       const templates = projectTemplateService.getTemplates();
       res.json(templates);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -332,8 +385,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json(template);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -363,8 +420,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       res.json({ project, cloneResult });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -378,8 +439,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const repos = await projectService.searchGitHubRepos(query as string, language as string);
       res.json(repos);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -387,8 +452,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const repos = await projectService.getUserGitHubRepos();
       res.json(repos);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -398,8 +467,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { path: dirPath = '.' } = req.query;
       const files = await fileService.listFiles(dirPath as string);
       res.json(files);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -408,8 +481,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { path: dirPath = '.', depth = 3 } = req.query;
       const tree = await fileService.getFileTree(dirPath as string, parseInt(depth as string));
       res.json(tree);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -422,8 +499,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const content = await fileService.readFile(filePath as string);
       res.json({ content });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -436,8 +517,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await fileService.writeFile(filePath, content || '');
       res.json({ message: "File saved successfully" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -455,8 +540,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ message: `${type} created successfully` });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -470,8 +559,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const results = await fileService.searchInFiles(searchTerm, searchPath, filePattern);
       res.json(results);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -485,8 +578,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await fileService.copyFile(sourcePath, destPath);
       res.json({ message: "File copied successfully" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -500,8 +597,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await fileService.moveFile(sourcePath, destPath);
       res.json({ message: "File moved successfully" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -515,8 +616,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const stats = await fileService.getFileStats(filePath as string);
       res.json(stats);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -534,8 +639,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({ message: `${type} deleted successfully` });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -560,8 +669,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ sessionId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -576,8 +689,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await terminalService.executeCommand(sessionId, command);
       res.json({ message: "Command executed" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -586,8 +703,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sessionId } = req.params;
       const history = terminalService.getCommandHistory(sessionId);
       res.json(history);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -602,8 +723,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const suggestions = await terminalService.autocomplete(sessionId, partialCommand);
       res.json({ suggestions });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -617,8 +742,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(404).json({ error: "Terminal session not found" });
       }
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -627,8 +756,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { projectId } = req.query;
       res.json({ message: "API testing suites endpoint" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -638,8 +771,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { apiTestingService } = await import('./services/apiTestingService');
       await apiTestingService.createTestSuite(projectId, endpoints);
       res.json({ message: "Test suite created successfully" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -649,8 +786,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { apiTestingService } = await import('./services/apiTestingService');
       const results = await apiTestingService.runTests(projectId);
       res.json(results);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -661,8 +802,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { performanceService } = await import('./services/performanceService');
       const profileId = await performanceService.startProfiling(projectId, duration);
       res.json({ profileId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -672,8 +817,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { performanceService } = await import('./services/performanceService');
       const profiles = performanceService.getProfiles(projectId);
       res.json(profiles);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -683,8 +832,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { performanceService } = await import('./services/performanceService');
       const suggestions = await performanceService.analyzeCode(projectPath);
       res.json(suggestions);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -694,8 +847,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cicdService } = await import('./services/cicdService');
       const pipelines = cicdService.getPipelines();
       res.json(pipelines);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -705,8 +862,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cicdService } = await import('./services/cicdService');
       await cicdService.createPipeline(pipelineConfig);
       res.json({ message: "Pipeline created successfully" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -716,8 +877,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cicdService } = await import('./services/cicdService');
       const runId = await cicdService.runPipeline(pipelineId);
       res.json({ runId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -727,8 +892,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cicdService } = await import('./services/cicdService');
       const run = cicdService.getPipelineRun(runId);
       res.json(run);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -738,8 +907,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mobileDevService } = await import('./services/mobileDevService');
       const projects = mobileDevService.getProjects();
       res.json(projects);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -749,8 +922,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mobileDevService } = await import('./services/mobileDevService');
       const projectId = await mobileDevService.createMobileProject(projectConfig);
       res.json({ projectId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -760,8 +937,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mobileDevService } = await import('./services/mobileDevService');
       const buildId = await mobileDevService.buildProject(projectId, platform, buildType);
       res.json({ buildId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -770,8 +951,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mobileDevService } = await import('./services/mobileDevService');
       const devices = await mobileDevService.getConnectedDevices();
       res.json(devices);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -781,8 +966,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mlWorkflowService } = await import('./services/mlWorkflowService');
       const datasets = mlWorkflowService.getDatasets();
       res.json(datasets);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -792,8 +981,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mlWorkflowService } = await import('./services/mlWorkflowService');
       const datasetId = await mlWorkflowService.createDataset(datasetConfig);
       res.json({ datasetId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -802,8 +995,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mlWorkflowService } = await import('./services/mlWorkflowService');
       const models = mlWorkflowService.getModels();
       res.json(models);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -813,8 +1010,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mlWorkflowService } = await import('./services/mlWorkflowService');
       const modelId = await mlWorkflowService.createModel(modelConfig);
       res.json({ modelId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -824,8 +1025,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mlWorkflowService } = await import('./services/mlWorkflowService');
       const jobId = await mlWorkflowService.startTraining(trainingConfig);
       res.json({ jobId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -835,8 +1040,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mlWorkflowService } = await import('./services/mlWorkflowService');
       const job = mlWorkflowService.getTrainingJob(jobId);
       res.json(job);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -845,8 +1054,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { mlWorkflowService } = await import('./services/mlWorkflowService');
       const gpuAvailable = await mlWorkflowService.checkGpuAvailability();
       res.json({ gpuAvailable });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -857,8 +1070,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { securityService } = await import('./services/securityService');
       const scanId = await securityService.scanProject(projectId, projectPath);
       res.json({ scanId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -872,8 +1089,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         res.status(404).json({ error: 'Scan not found' });
       }
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -883,8 +1104,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { securityService } = await import('./services/securityService');
       const scans = securityService.getAllScans(projectId as string);
       res.json(scans);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -894,8 +1119,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { automatedTestingService } = await import('./services/automatedTestingService');
       const suites = automatedTestingService.getAllTestSuites();
       res.json(suites);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -905,8 +1134,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { automatedTestingService } = await import('./services/automatedTestingService');
       const suiteId = await automatedTestingService.createTestSuite(suiteConfig);
       res.json({ suiteId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -916,8 +1149,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { automatedTestingService } = await import('./services/automatedTestingService');
       const resultId = await automatedTestingService.runTestSuite(suiteId);
       res.json({ resultId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -927,8 +1164,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { automatedTestingService } = await import('./services/automatedTestingService');
       const results = automatedTestingService.getTestResults(suiteId);
       res.json(results);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -939,8 +1180,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { distributedTrainingService } = await import('./services/distributedTrainingService');
       const nodeId = await distributedTrainingService.registerNode(nodeConfig);
       res.json({ nodeId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -950,8 +1195,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { distributedTrainingService } = await import('./services/distributedTrainingService');
       const jobId = await distributedTrainingService.startDistributedTraining(trainingConfig);
       res.json({ jobId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -961,8 +1210,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { distributedTrainingService } = await import('./services/distributedTrainingService');
       const job = await distributedTrainingService.getJobStatus(jobId);
       res.json(job);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -971,8 +1224,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { distributedTrainingService } = await import('./services/distributedTrainingService');
       const nodes = distributedTrainingService.getAvailableNodes();
       res.json(nodes);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -983,8 +1240,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { containerService } = await import('./services/containerService');
       const configId = await containerService.createContainerConfig(containerConfig);
       res.json({ configId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -994,8 +1255,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { containerService } = await import('./services/containerService');
       const imageName = await containerService.buildContainer(configId);
       res.json({ imageName });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1006,8 +1271,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { containerService } = await import('./services/containerService');
       const instanceId = await containerService.runContainer(configId, imageName);
       res.json({ instanceId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1016,8 +1285,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { containerService } = await import('./services/containerService');
       const instances = containerService.getAllContainerInstances();
       res.json(instances);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1027,8 +1300,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { containerService } = await import('./services/containerService');
       const deploymentId = await containerService.createKubernetesDeployment(deploymentConfig);
       res.json({ deploymentId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1039,8 +1316,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { debuggingService } = await import('./services/debuggingService');
       const sessionId = await debuggingService.startDebugSession(projectId, type, config);
       res.json({ sessionId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1051,8 +1332,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { debuggingService } = await import('./services/debuggingService');
       const breakpointId = await debuggingService.addBreakpoint(sessionId, file, line, condition);
       res.json({ breakpointId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1062,8 +1347,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { debuggingService } = await import('./services/debuggingService');
       const analysisId = await debuggingService.analyzeError(errorInfo);
       res.json({ analysisId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1074,8 +1363,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { debuggingService } = await import('./services/debuggingService');
       const fixId = await debuggingService.attemptAutoFix(analysisId, suggestionId);
       res.json({ fixId });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1084,8 +1377,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { debuggingService } = await import('./services/debuggingService');
       const sessions = debuggingService.getAllDebugSessions();
       res.json(sessions);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1096,8 +1393,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       const session = await browserService.createBrowserSession(sessionId);
       res.json({ sessionId, success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1108,8 +1409,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       await browserService.navigateToUrl(sessionId, pageId, url);
       res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1120,8 +1425,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       const screenshot = await browserService.takeScreenshot(sessionId, pageId);
       res.json({ screenshot, success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1132,8 +1441,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       const data = await browserService.extractData(sessionId, pageId, selector);
       res.json({ data, success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1144,8 +1457,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       await browserService.clickElement(sessionId, pageId, selector);
       res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1156,8 +1473,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       await browserService.typeText(sessionId, pageId, selector, text);
       res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1166,8 +1487,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       const scripts = browserService.getAllAutomationScripts();
       res.json(scripts);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1177,8 +1502,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       const runId = await browserService.runAutomationScript(scriptId, url);
       res.json({ runId, success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1187,8 +1516,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       const data = browserService.getScrapedData();
       res.json(data);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1198,8 +1531,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       const tabId = await browserService.createNewTab(sessionId);
       res.json({ tabId, success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1209,8 +1546,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       await browserService.closeTab(sessionId, pageId);
       res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1220,8 +1561,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { browserService } = await import('./services/browserService');
       await browserService.closeBrowserSession(sessionId);
       res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1271,144 +1616,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const models = aiModelProvider.getAvailableModels();
       res.json(models);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
   app.post("/api/ai/models/search/huggingface", async (req, res) => {
     try {
-      const { query, filter } = req.body;
-      if (!query) {
-        return res.status(400).json({ error: "Search query is required" });
-      }
+      const { query, filter } = searchHuggingFaceSchema.parse(req.body);
       
       const models = await aiModelProvider.searchHuggingFaceModels(query, filter);
       res.json(models);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
   app.post("/api/ai/models/download/huggingface", async (req, res) => {
     try {
-      const { modelId } = req.body;
-      if (!modelId) {
-        return res.status(400).json({ error: "Model ID is required" });
-      }
+      const { modelId } = downloadModelSchema.parse(req.body);
       
       const downloadId = await aiModelProvider.downloadHuggingFaceModel(modelId);
       res.json({ downloadId, message: "Download started" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
   app.post("/api/ai/models/pull/ollama", async (req, res) => {
     try {
-      const { modelName } = req.body;
-      if (!modelName) {
-        return res.status(400).json({ error: "Model name is required" });
-      }
+      const { modelName } = pullOllamaSchema.parse(req.body);
       
       const pullId = await aiModelProvider.pullOllamaModel(modelName);
       res.json({ pullId, message: "Pull started" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
   // AI Generation API
   app.post("/api/ai/generate/text", async (req, res) => {
     try {
-      const { prompt, model, options } = req.body;
-      if (!prompt) {
-        return res.status(400).json({ error: "Prompt is required" });
-      }
+      const { prompt, model, options } = generateTextSchema.parse(req.body);
       
       const result = await aiModelProvider.generateText(prompt, model, options);
       res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
   app.post("/api/ai/generate/image", async (req, res) => {
     try {
-      const { prompt, options } = req.body;
-      if (!prompt) {
-        return res.status(400).json({ error: "Prompt is required" });
-      }
+      const { prompt, options } = generateImageSchema.parse(req.body);
       
       const result = await aiModelProvider.generateImage(prompt, options);
       res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
   app.post("/api/ai/analyze/image", async (req, res) => {
     try {
-      const { imageData, prompt } = req.body;
-      if (!imageData) {
-        return res.status(400).json({ error: "Image data is required" });
-      }
+      const { imageData, prompt } = analyzeImageSchema.parse(req.body);
       
       const result = await aiModelProvider.analyzeImage(imageData, prompt);
       res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
   // AI Agent API
   app.post("/api/ai/agent/analyze-project", async (req, res) => {
     try {
-      const { projectPath, githubUrl } = req.body;
+      const { projectPath, githubUrl } = analyzeProjectSchema.parse(req.body);
       
       const analysis = await aiAgentService.analyzeProject(projectPath || '.', githubUrl);
       res.json(analysis);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
   app.post("/api/ai/agent/run-project", async (req, res) => {
     try {
-      const { projectPath, analysis } = req.body;
+      const { projectPath, analysis } = runProjectSchema.parse(req.body);
       
       const result = await aiAgentService.runProject(projectPath || '.', analysis);
       res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
   app.post("/api/ai/agent/browse-web", async (req, res) => {
     try {
-      const { url, task } = req.body;
-      if (!url || !task) {
-        return res.status(400).json({ error: "URL and task are required" });
-      }
+      const { url, task } = browseWebSchema.parse(req.body);
       
       const result = await aiAgentService.browseWebWithAI(url, task);
       res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
   app.post("/api/ai/agent/execute-commands", async (req, res) => {
     try {
-      const { commands, workingDir } = req.body;
-      if (!commands || !Array.isArray(commands)) {
-        return res.status(400).json({ error: "Commands array is required" });
-      }
+      const { commands, workingDir } = executeCommandsSchema.parse(req.body);
       
       const result = await aiAgentService.executeCommandsWithAI(commands, workingDir);
       res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1417,8 +1782,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeTasks = aiAgentService.getActiveTasks();
       const history = aiAgentService.getTaskHistory(10);
       res.json({ activeTasks, history });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1430,8 +1799,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Task not found" });
       }
       res.json(task);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
@@ -1443,51 +1816,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Task not found" });
       }
       res.json({ message: "Task cancelled" });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        res.status(400).json({ error: 'Validation error', details: error.errors });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+      }
     }
   });
 
-  // Socket.IO setup for real-time communication
+  // Socket.IO setup for real-time communication with proper event bridging
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
-    // Model download progress
-    aiModelProvider.on('model-download-progress', (data) => {
-      socket.emit('model:progress', data);
-    });
+    // Bridge AI Model Provider events to Socket.IO
+    const onModelProgress = (data: any) => io.emit('model:progress', data);
+    const onModelComplete = (data: any) => io.emit('model:complete', data);
+    const onModelError = (data: any) => io.emit('model:error', data);
+    const onOllamaProgress = (data: any) => io.emit('ollama:progress', data);
+    const onOllamaComplete = (data: any) => io.emit('ollama:complete', data);
 
-    aiModelProvider.on('model-download-complete', (data) => {
-      socket.emit('model:complete', data);
-    });
+    aiModelProvider.on('model-download-progress', onModelProgress);
+    aiModelProvider.on('model-download-complete', onModelComplete);
+    aiModelProvider.on('model-download-error', onModelError);
+    aiModelProvider.on('ollama-pull-progress', onOllamaProgress);
+    aiModelProvider.on('ollama-pull-complete', onOllamaComplete);
 
-    aiModelProvider.on('ollama-pull-progress', (data) => {
-      socket.emit('ollama:progress', data);
-    });
+    // Bridge AI Agent Service events to Socket.IO
+    const onTaskStarted = (task: any) => io.emit('agent:task-started', task);
+    const onStepCompleted = (data: any) => io.emit('agent:step-completed', data);
+    const onTaskCompleted = (task: any) => io.emit('agent:task-completed', task);
+    const onTaskFailed = (task: any) => io.emit('agent:task-failed', task);
+    const onTaskCancelled = (task: any) => io.emit('agent:task-cancelled', task);
 
-    aiModelProvider.on('ollama-pull-complete', (data) => {
-      socket.emit('ollama:complete', data);
-    });
-
-    // AI Agent task updates
-    aiAgentService.on('task-started', (task) => {
-      socket.emit('agent:task-started', task);
-    });
-
-    aiAgentService.on('step-completed', (data) => {
-      socket.emit('agent:step-completed', data);
-    });
-
-    aiAgentService.on('task-completed', (task) => {
-      socket.emit('agent:task-completed', task);
-    });
-
-    aiAgentService.on('task-failed', (task) => {
-      socket.emit('agent:task-failed', task);
-    });
+    aiAgentService.on('task-started', onTaskStarted);
+    aiAgentService.on('step-completed', onStepCompleted);
+    aiAgentService.on('task-completed', onTaskCompleted);
+    aiAgentService.on('task-failed', onTaskFailed);
+    aiAgentService.on('task-cancelled', onTaskCancelled);
 
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
+      
+      // Clean up event listeners to prevent memory leaks
+      aiModelProvider.off('model-download-progress', onModelProgress);
+      aiModelProvider.off('model-download-complete', onModelComplete);
+      aiModelProvider.off('model-download-error', onModelError);
+      aiModelProvider.off('ollama-pull-progress', onOllamaProgress);
+      aiModelProvider.off('ollama-pull-complete', onOllamaComplete);
+      
+      aiAgentService.off('task-started', onTaskStarted);
+      aiAgentService.off('step-completed', onStepCompleted);
+      aiAgentService.off('task-completed', onTaskCompleted);
+      aiAgentService.off('task-failed', onTaskFailed);
+      aiAgentService.off('task-cancelled', onTaskCancelled);
     });
   });
 

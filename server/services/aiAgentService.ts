@@ -1,6 +1,7 @@
 // AI Agent Service - Intelligent task automation and development assistance
 import OpenAI from "openai";
 import { EventEmitter } from 'events';
+import path from 'path';
 import { terminalService } from './terminalService';
 import { browserService } from './browserService';
 import { fileService } from './fileService';
@@ -82,7 +83,7 @@ export class AIAgentService extends EventEmitter {
       const step1 = this.createStep('Read project structure', 'file');
       task.steps.push(step1);
       
-      const files = await fileService.listFiles('.');
+      const files = await fileService.listFiles(projectPath);
       step1.result = files;
       step1.status = 'completed';
       this.emit('step-completed', { taskId, step: step1 });
@@ -96,12 +97,17 @@ export class AIAgentService extends EventEmitter {
 
       for (const fileName of keyFiles) {
         try {
-          const content = await fileService.readFile(fileName);
+          const content = await fileService.readFile(path.join(projectPath, fileName));
           if (content) {
-            projectData[fileName] = JSON.parse(content);
+            // Only parse as JSON for files that are actually JSON
+            if (fileName.endsWith('.json') || fileName === 'package.json') {
+              projectData[fileName] = JSON.parse(content);
+            } else {
+              projectData[fileName] = content; // Store as text for requirements.txt, etc.
+            }
           }
         } catch (error) {
-          // File doesn't exist or isn't JSON, continue
+          // File doesn't exist or parsing failed, continue
         }
       }
 
@@ -162,12 +168,16 @@ export class AIAgentService extends EventEmitter {
       const step1 = this.createStep('Install dependencies', 'terminal');
       task.steps.push(step1);
 
-      for (const command of analysis.setupInstructions) {
-        const sessionId = `agent-${Date.now()}`;
-        const session = terminalService.createSession(sessionId, projectPath);
-        
-        await this.executeCommand(session, command);
-        step1.result = `Executed: ${command}`;
+      if (analysis.setupInstructions && analysis.setupInstructions.length > 0) {
+        for (const command of analysis.setupInstructions) {
+          const sessionId = `agent-${Date.now()}`;
+          const session = terminalService.createSession(sessionId, projectPath);
+          
+          await this.executeCommand(session, command);
+          step1.result = `Executed: ${command}`;
+        }
+      } else {
+        step1.result = 'No setup instructions needed';
       }
       
       step1.status = 'completed';
@@ -177,7 +187,9 @@ export class AIAgentService extends EventEmitter {
       const step2 = this.createStep('Start project', 'terminal');
       task.steps.push(step2);
 
-      const runCommand = analysis.runCommands[0] || 'npm start';
+      const runCommand = (analysis.runCommands && analysis.runCommands.length > 0) 
+        ? analysis.runCommands[0] 
+        : 'npm start';
       const sessionId = `agent-run-${Date.now()}`;
       const session = terminalService.createSession(sessionId, projectPath);
       
@@ -359,7 +371,7 @@ Please provide analysis in JSON format:
       `;
 
       const response = await this.openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",

@@ -1,6 +1,7 @@
 // Enhanced AI Model Provider with OpenAI, Ollama, and HuggingFace integration
 import OpenAI from "openai";
 import { EventEmitter } from 'events';
+import { huggingFaceService } from './huggingFaceService';
 
 /* 
   AI Model Provider Integration:
@@ -53,8 +54,8 @@ export class AIModelProvider extends EventEmitter {
   private async initializeProviders() {
     // Initialize OpenAI models
     if (process.env.OPENAI_API_KEY) {
-      this.models.set('gpt-5', {
-        name: 'GPT-5',
+      this.models.set('gpt-4o', {
+        name: 'GPT-4o',
         type: 'multimodal',
         capabilities: ['text', 'vision', 'reasoning'],
         status: 'ready'
@@ -77,23 +78,9 @@ export class AIModelProvider extends EventEmitter {
 
   async searchHuggingFaceModels(query: string, filter?: string): Promise<any[]> {
     try {
-      const params = new URLSearchParams({
-        search: query,
-        limit: '20',
-        full: 'true'
-      });
-
-      if (filter) {
-        params.append('filter', filter);
-      }
-
-      const response = await fetch(`${this.hfApiUrl}/models?${params}`);
-      if (!response.ok) {
-        throw new Error(`HuggingFace search failed: ${response.statusText}`);
-      }
-
-      const models = await response.json();
-      return models.slice(0, 20);
+      // Use the existing huggingFaceService for real search
+      const results = await huggingFaceService.searchModels(query);
+      return results.slice(0, 20);
     } catch (error) {
       console.error('Error searching HuggingFace models:', error);
       return [];
@@ -111,31 +98,41 @@ export class AIModelProvider extends EventEmitter {
       progress: 0
     });
 
-    // Simulate download progress (in real implementation, use actual HF download)
-    let progress = 0;
-    const progressInterval = setInterval(() => {
-      progress += Math.random() * 15;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(progressInterval);
-        
+    try {
+      // Use real HuggingFace service for download
+      const result = await huggingFaceService.downloadModel(modelId);
+      
+      // Start progress tracking
+      const trackProgress = () => {
         const model = this.models.get(downloadId);
-        if (model) {
-          model.status = 'ready';
-          model.progress = 100;
-        }
-        
-        this.emit('model-download-complete', { modelId: downloadId, model });
-      } else {
-        const model = this.models.get(downloadId);
-        if (model) {
+        if (model && model.status === 'downloading') {
+          const progress = Math.min(model.progress! + Math.random() * 10, 90);
           model.progress = progress;
+          this.emit('model-download-progress', { modelId: downloadId, progress });
+          
+          if (progress < 90) {
+            setTimeout(trackProgress, 1000);
+          } else {
+            // Complete the download
+            model.status = 'ready';
+            model.progress = 100;
+            this.emit('model-download-complete', { modelId: downloadId, model });
+          }
         }
-        this.emit('model-download-progress', { modelId: downloadId, progress });
+      };
+      
+      trackProgress();
+      return downloadId;
+      
+    } catch (error) {
+      const model = this.models.get(downloadId);
+      if (model) {
+        model.status = 'error';
+        model.progress = 0;
       }
-    }, 500);
-
-    return downloadId;
+      this.emit('model-download-error', { modelId: downloadId, error });
+      throw error;
+    }
   }
 
   async checkOllamaModels(): Promise<void> {
@@ -157,14 +154,14 @@ export class AIModelProvider extends EventEmitter {
     }
   }
 
-  async generateText(prompt: string, model: string = 'gpt-5', options?: any): Promise<GenerationResult> {
+  async generateText(prompt: string, model: string = 'gpt-4o', options?: any): Promise<GenerationResult> {
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OpenAI API key not configured');
     }
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: model === 'gpt-5' ? 'gpt-5' : 'gpt-4',
+        model: model === 'gpt-5' ? 'gpt-4o' : model,
         messages: [{ role: 'user', content: prompt }],
         ...options
       });
@@ -226,7 +223,7 @@ export class AIModelProvider extends EventEmitter {
 
     try {
       const response = await this.openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o",
         messages: [
           {
             role: "user",
@@ -239,7 +236,7 @@ export class AIModelProvider extends EventEmitter {
             ],
           },
         ],
-        max_completion_tokens: 2048,
+        max_tokens: 2048,
       });
 
       return {
@@ -247,7 +244,7 @@ export class AIModelProvider extends EventEmitter {
         type: 'text',
         content: response.choices[0].message.content || '',
         metadata: { 
-          model: 'gpt-5',
+          model: 'gpt-4o',
           analysis_type: 'vision',
           usage: response.usage 
         },
