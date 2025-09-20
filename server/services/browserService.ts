@@ -294,7 +294,9 @@ export class BrowserService {
     try {
       await page.waitForSelector(selector, { timeout: 5000 });
       await page.focus(selector);
-      await page.keyboard.selectAll();
+      await page.keyboard.down('Control');
+      await page.keyboard.press('KeyA');
+      await page.keyboard.up('Control');
       await page.type(selector, text);
 
       session.emitter.emit('text-typed', { pageId, selector, text });

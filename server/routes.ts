@@ -7,6 +7,8 @@ import { huggingFaceService } from "./services/huggingFaceService";
 import { terminalService } from "./services/terminalService";
 import { fileService } from "./services/fileService";
 import { projectService } from "./services/projectService";
+import { aiModelProvider } from "./services/aiModelProvider";
+import { aiAgentService } from "./services/aiAgentService";
 import { insertModelSchema, insertProjectSchema, insertExecutionSchema } from "@shared/schema";
 import { Server as SocketIOServer } from "socket.io";
 
@@ -17,6 +19,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       origin: "*",
       methods: ["GET", "POST"]
     }
+  });
+
+  // Health API
+  app.get("/api/health", (req, res) => {
+    const storageType = process.env.DATABASE_URL ? 'database' : 'memory';
+    res.json({
+      status: 'ok',
+      storage: storageType,
+      timestamp: new Date().toISOString(),
+      services: {
+        storage: 'active',
+        ollama: process.env.OLLAMA_URL ? 'configured' : 'not_configured',
+        github: 'available'
+      }
+    });
   });
 
   // Dashboard API
@@ -1246,6 +1263,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Training progress events
     socket.on('training-progress', async (data) => {
       socket.emit('training-update', data);
+    });
+  });
+
+  // Enhanced AI Model Management API
+  app.get("/api/ai/models", async (req, res) => {
+    try {
+      const models = aiModelProvider.getAvailableModels();
+      res.json(models);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ai/models/search/huggingface", async (req, res) => {
+    try {
+      const { query, filter } = req.body;
+      if (!query) {
+        return res.status(400).json({ error: "Search query is required" });
+      }
+      
+      const models = await aiModelProvider.searchHuggingFaceModels(query, filter);
+      res.json(models);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ai/models/download/huggingface", async (req, res) => {
+    try {
+      const { modelId } = req.body;
+      if (!modelId) {
+        return res.status(400).json({ error: "Model ID is required" });
+      }
+      
+      const downloadId = await aiModelProvider.downloadHuggingFaceModel(modelId);
+      res.json({ downloadId, message: "Download started" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ai/models/pull/ollama", async (req, res) => {
+    try {
+      const { modelName } = req.body;
+      if (!modelName) {
+        return res.status(400).json({ error: "Model name is required" });
+      }
+      
+      const pullId = await aiModelProvider.pullOllamaModel(modelName);
+      res.json({ pullId, message: "Pull started" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // AI Generation API
+  app.post("/api/ai/generate/text", async (req, res) => {
+    try {
+      const { prompt, model, options } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ error: "Prompt is required" });
+      }
+      
+      const result = await aiModelProvider.generateText(prompt, model, options);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ai/generate/image", async (req, res) => {
+    try {
+      const { prompt, options } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ error: "Prompt is required" });
+      }
+      
+      const result = await aiModelProvider.generateImage(prompt, options);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ai/analyze/image", async (req, res) => {
+    try {
+      const { imageData, prompt } = req.body;
+      if (!imageData) {
+        return res.status(400).json({ error: "Image data is required" });
+      }
+      
+      const result = await aiModelProvider.analyzeImage(imageData, prompt);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // AI Agent API
+  app.post("/api/ai/agent/analyze-project", async (req, res) => {
+    try {
+      const { projectPath, githubUrl } = req.body;
+      
+      const analysis = await aiAgentService.analyzeProject(projectPath || '.', githubUrl);
+      res.json(analysis);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ai/agent/run-project", async (req, res) => {
+    try {
+      const { projectPath, analysis } = req.body;
+      
+      const result = await aiAgentService.runProject(projectPath || '.', analysis);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ai/agent/browse-web", async (req, res) => {
+    try {
+      const { url, task } = req.body;
+      if (!url || !task) {
+        return res.status(400).json({ error: "URL and task are required" });
+      }
+      
+      const result = await aiAgentService.browseWebWithAI(url, task);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ai/agent/execute-commands", async (req, res) => {
+    try {
+      const { commands, workingDir } = req.body;
+      if (!commands || !Array.isArray(commands)) {
+        return res.status(400).json({ error: "Commands array is required" });
+      }
+      
+      const result = await aiAgentService.executeCommandsWithAI(commands, workingDir);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/ai/agent/tasks", async (req, res) => {
+    try {
+      const activeTasks = aiAgentService.getActiveTasks();
+      const history = aiAgentService.getTaskHistory(10);
+      res.json({ activeTasks, history });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.get("/api/ai/agent/tasks/:taskId", async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const task = aiAgentService.getTask(taskId);
+      if (!task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      res.json(task);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  app.post("/api/ai/agent/tasks/:taskId/cancel", async (req, res) => {
+    try {
+      const { taskId } = req.params;
+      const cancelled = await aiAgentService.cancelTask(taskId);
+      if (!cancelled) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+      res.json({ message: "Task cancelled" });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Socket.IO setup for real-time communication
+  io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+
+    // Model download progress
+    aiModelProvider.on('model-download-progress', (data) => {
+      socket.emit('model:progress', data);
+    });
+
+    aiModelProvider.on('model-download-complete', (data) => {
+      socket.emit('model:complete', data);
+    });
+
+    aiModelProvider.on('ollama-pull-progress', (data) => {
+      socket.emit('ollama:progress', data);
+    });
+
+    aiModelProvider.on('ollama-pull-complete', (data) => {
+      socket.emit('ollama:complete', data);
+    });
+
+    // AI Agent task updates
+    aiAgentService.on('task-started', (task) => {
+      socket.emit('agent:task-started', task);
+    });
+
+    aiAgentService.on('step-completed', (data) => {
+      socket.emit('agent:step-completed', data);
+    });
+
+    aiAgentService.on('task-completed', (task) => {
+      socket.emit('agent:task-completed', task);
+    });
+
+    aiAgentService.on('task-failed', (task) => {
+      socket.emit('agent:task-failed', task);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Client disconnected:', socket.id);
     });
   });
 
