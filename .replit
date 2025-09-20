@@ -1,9 +1,9 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+modules = ["nodejs-20", "web"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
-channel = "stable-24_05"
+channel = "stable-25_05"
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -14,11 +14,16 @@ run = ["npm", "run", "start"]
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 39019
+externalPort = 3000
+
 [env]
 PORT = "5000"
 
 [agent]
 integrations = ["javascript_database:1.0.0", "github:1.0.0"]
+expertMode = true
 
 [workflows]
 runButton = "Project"
