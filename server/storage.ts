@@ -4,8 +4,19 @@ import {
   type Model, type InsertModel, type Execution, type InsertExecution,
   type File, type InsertFile
 } from "@shared/schema";
-import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
+import { nanoid } from "nanoid";
+
+// Conditionally import db to avoid errors when DATABASE_URL is not set
+let db: any;
+try {
+  if (process.env.DATABASE_URL) {
+    const dbModule = require("./db");
+    db = dbModule.db;
+  }
+} catch (error) {
+  console.warn("Database module failed to load:", error);
+}
 
 export interface IStorage {
   // Users
@@ -179,4 +190,222 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// In-memory storage implementation for development/fallback
+export class MemStorage implements IStorage {
+  private users = new Map<string, User>();
+  private projects = new Map<string, Project>();
+  private models = new Map<string, Model>();
+  private executions = new Map<string, Execution>();
+  private files = new Map<string, File>();
+
+  // Users
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(u => u.username === username);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const user: User = {
+      id: nanoid(),
+      createdAt: new Date(),
+      ...insertUser
+    };
+    this.users.set(user.id, user);
+    return user;
+  }
+
+  // Projects
+  async getProject(id: string): Promise<Project | undefined> {
+    return this.projects.get(id);
+  }
+
+  async getProjectsByUser(userId: string): Promise<Project[]> {
+    return Array.from(this.projects.values())
+      .filter(p => p.userId === userId)
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }
+
+  async createProject(insertProject: InsertProject): Promise<Project> {
+    const project: Project = {
+      id: nanoid(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      status: 'active',
+      description: null,
+      githubUrl: null,
+      metadata: {},
+      ...insertProject
+    };
+    this.projects.set(project.id, project);
+    return project;
+  }
+
+  async updateProject(id: string, projectUpdate: Partial<InsertProject>): Promise<Project | undefined> {
+    const project = this.projects.get(id);
+    if (!project) return undefined;
+
+    const updated = {
+      ...project,
+      ...projectUpdate,
+      updatedAt: new Date()
+    };
+    this.projects.set(id, updated);
+    return updated;
+  }
+
+  async deleteProject(id: string): Promise<boolean> {
+    return this.projects.delete(id);
+  }
+
+  // Models
+  async getModel(id: string): Promise<Model | undefined> {
+    return this.models.get(id);
+  }
+
+  async getModels(): Promise<Model[]> {
+    return Array.from(this.models.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getModelByModelId(modelId: string): Promise<Model | undefined> {
+    return Array.from(this.models.values()).find(m => m.modelId === modelId);
+  }
+
+  async createModel(insertModel: InsertModel): Promise<Model> {
+    const model: Model = {
+      id: nanoid(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      status: 'downloading',
+      size: null,
+      parameters: null,
+      contextLength: null,
+      downloadProgress: 0,
+      config: {},
+      performance: {},
+      ...insertModel
+    };
+    this.models.set(model.id, model);
+    return model;
+  }
+
+  async updateModel(id: string, modelUpdate: Partial<InsertModel>): Promise<Model | undefined> {
+    const model = this.models.get(id);
+    if (!model) return undefined;
+
+    const updated = {
+      ...model,
+      ...modelUpdate,
+      updatedAt: new Date()
+    };
+    this.models.set(id, updated);
+    return updated;
+  }
+
+  async deleteModel(id: string): Promise<boolean> {
+    return this.models.delete(id);
+  }
+
+  // Executions
+  async getExecution(id: string): Promise<Execution | undefined> {
+    return this.executions.get(id);
+  }
+
+  async getExecutionsByProject(projectId: string): Promise<Execution[]> {
+    return Array.from(this.executions.values())
+      .filter(e => e.projectId === projectId)
+      .sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
+  }
+
+  async createExecution(insertExecution: InsertExecution): Promise<Execution> {
+    const execution: Execution = {
+      id: nanoid(),
+      startTime: new Date(),
+      endTime: null,
+      status: 'running',
+      output: null,
+      error: null,
+      exitCode: null,
+      ...insertExecution
+    };
+    this.executions.set(execution.id, execution);
+    return execution;
+  }
+
+  async updateExecution(id: string, executionUpdate: Partial<InsertExecution>): Promise<Execution | undefined> {
+    const execution = this.executions.get(id);
+    if (!execution) return undefined;
+
+    const updated = {
+      ...execution,
+      ...executionUpdate,
+      updatedAt: new Date()
+    };
+    this.executions.set(id, updated);
+    return updated;
+  }
+
+  // Files
+  async getFile(id: string): Promise<File | undefined> {
+    return this.files.get(id);
+  }
+
+  async getFilesByProject(projectId: string): Promise<File[]> {
+    return Array.from(this.files.values())
+      .filter(f => f.projectId === projectId)
+      .sort((a, b) => a.path.localeCompare(b.path));
+  }
+
+  async getFileByPath(projectId: string, path: string): Promise<File | undefined> {
+    return Array.from(this.files.values())
+      .find(f => f.projectId === projectId && f.path === path);
+  }
+
+  async createFile(insertFile: InsertFile): Promise<File> {
+    const file: File = {
+      id: nanoid(),
+      modifiedAt: new Date(),
+      content: null,
+      size: null,
+      ...insertFile
+    };
+    this.files.set(file.id, file);
+    return file;
+  }
+
+  async updateFile(id: string, fileUpdate: Partial<InsertFile>): Promise<File | undefined> {
+    const file = this.files.get(id);
+    if (!file) return undefined;
+
+    const updated = {
+      ...file,
+      ...fileUpdate,
+      modifiedAt: new Date()
+    };
+    this.files.set(id, updated);
+    return updated;
+  }
+
+  async deleteFile(id: string): Promise<boolean> {
+    return this.files.delete(id);
+  }
+}
+
+// Use in-memory storage if database is not available, otherwise use database storage
+function createStorage(): IStorage {
+  try {
+    if (!process.env.DATABASE_URL) {
+      console.log("Using in-memory storage (DATABASE_URL not provided)");
+      return new MemStorage();
+    }
+    console.log("Using database storage");
+    return new DatabaseStorage();
+  } catch (error) {
+    console.warn("Database connection failed, falling back to in-memory storage:", error);
+    return new MemStorage();
+  }
+}
+
+export const storage = createStorage();

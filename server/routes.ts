@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import path from "path";
 import { storage } from "./storage";
 import { ollamaService } from "./services/ollamaService";
 import { huggingFaceService } from "./services/huggingFaceService";
